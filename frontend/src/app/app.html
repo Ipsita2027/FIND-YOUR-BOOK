@@ -1,0 +1,173 @@
+<main class="page">
+  <section class="hero">
+    <p class="eyebrow">Library Navigator</p>
+    <h1>{{ title() }}</h1>
+    <p class="subtitle">Catalog and search by title, author, ISBN, or category to find exact shelf location.</p>
+
+    <form class="search-form" autocomplete="off" (submit)="onSearchSubmit($event)">
+      <label for="searchInput" class="sr-only">Search books</label>
+      <input
+        id="searchInput"
+        type="text"
+        name="searchQuery"
+        [(ngModel)]="searchQuery"
+        placeholder="Try: atomc habits, geroge orwell, 9780451524935"
+      />
+      <button type="submit">Search</button>
+    </form>
+
+    <div class="filters">
+      <label for="categoryFilter">Category</label>
+      <select
+        id="categoryFilter"
+        name="selectedCategory"
+        [(ngModel)]="selectedCategory"
+        (change)="onCategoryChange()"
+      >
+        <option value="">All categories</option>
+        @for (category of categories(); track category) {
+          <option [value]="category">{{ category }}</option>
+        }
+      </select>
+    </div>
+  </section>
+
+  <section>
+    <div class="results-meta">{{ resultsMeta() }}</div>
+
+    @if (isLoading()) {
+      <p class="loading">Loading...</p>
+    }
+
+    <div class="results" aria-live="polite">
+      @for (book of books(); track book.id) {
+        <article class="book-card">
+          <header class="book-header">
+            <h2 class="book-title">{{ book.title }}</h2>
+            <span class="book-category">{{ book.category }}</span>
+          </header>
+          <p class="book-author">Author: {{ book.author }}</p>
+          <p class="book-isbn">ISBN: {{ book.isbn }}</p>
+          <dl class="location-grid">
+            <div>
+              <dt>Floor</dt>
+              <dd>{{ book.location.floor }}</dd>
+            </div>
+            <div>
+              <dt>Section</dt>
+              <dd>{{ book.location.section }}</dd>
+            </div>
+            <div>
+              <dt>Shelf</dt>
+              <dd>{{ book.location.shelf }}</dd>
+            </div>
+            <div>
+              <dt>Call Number</dt>
+              <dd>{{ book.location.callNumber }}</dd>
+            </div>
+          </dl>
+          <p class="availability" [attr.data-state]="book.status">Status: {{ book.status }}</p>
+        </article>
+      }
+    </div>
+  </section>
+</main>
+
+<button
+  type="button"
+  class="admin-panel-toggle"
+  aria-controls="adminPanel"
+  [attr.aria-expanded]="adminPanelVisible()"
+  (click)="toggleAdminPanel()"
+>
+  {{ adminPanelVisible() ? 'Close Add Book' : 'Add Book' }}
+</button>
+
+@if (adminPanelVisible()) {
+  <section id="adminPanel" class="admin-panel" aria-labelledby="addBookHeading">
+    <div class="add-book-panel-header">
+      <div>
+        <h2 id="addBookHeading">Add New Book</h2>
+        <p class="admin-hint">Open the panel, then sign in as admin to add a book.</p>
+      </div>
+      <button type="button" class="admin-panel-close" (click)="closeAdminPanel()">Close</button>
+    </div>
+
+    @if (!isAdminLoggedIn()) {
+      <form class="admin-login-form" autocomplete="off" (submit)="onLoginSubmit($event)">
+        <div class="admin-login-grid">
+          <label>
+            <span>Admin Username</span>
+            <input name="adminUsername" type="text" [(ngModel)]="adminUsername" required />
+          </label>
+          <label>
+            <span>Admin Password</span>
+            <input name="adminPassword" type="password" [(ngModel)]="adminPassword" required />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit">Sign in</button>
+          <p class="form-message" [attr.data-state]="adminAuthState()" aria-live="polite">
+            {{ adminAuthMessage() }}
+          </p>
+        </div>
+      </form>
+    }
+
+    @if (isAdminLoggedIn()) {
+      <div class="admin-session-panel">
+        <p class="form-message" aria-live="polite">Admin logged in. You can add books.</p>
+        <button type="button" (click)="onLogout()">Logout</button>
+      </div>
+    }
+
+    <form class="add-book-form" autocomplete="off" (submit)="onAddBookSubmit($event)">
+      <div class="form-grid">
+        <label>
+          <span>Title</span>
+          <input name="title" type="text" [(ngModel)]="newBook.title" required />
+        </label>
+        <label>
+          <span>Author</span>
+          <input name="author" type="text" [(ngModel)]="newBook.author" required />
+        </label>
+        <label>
+          <span>ISBN</span>
+          <input name="isbn" type="text" [(ngModel)]="newBook.isbn" required />
+        </label>
+        <label>
+          <span>Category</span>
+          <input name="category" type="text" [(ngModel)]="newBook.category" required />
+        </label>
+        <label>
+          <span>Floor</span>
+          <input name="floor" type="text" [(ngModel)]="newBook.floor" required />
+        </label>
+        <label>
+          <span>Section</span>
+          <input name="section" type="text" [(ngModel)]="newBook.section" required />
+        </label>
+        <label>
+          <span>Shelf</span>
+          <input name="shelf" type="text" [(ngModel)]="newBook.shelf" required />
+        </label>
+        <label>
+          <span>Call Number</span>
+          <input name="callNumber" type="text" [(ngModel)]="newBook.callNumber" required />
+        </label>
+        <label>
+          <span>Status</span>
+          <select name="status" [(ngModel)]="newBook.status">
+            <option value="available">available</option>
+            <option value="checked-out">checked-out</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit">Add Book</button>
+        <p class="form-message" [attr.data-state]="addBookState()" aria-live="polite">{{ addBookMessage() }}</p>
+      </div>
+    </form>
+  </section>
+}
