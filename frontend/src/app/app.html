@@ -119,6 +119,25 @@
         <p class="form-message" aria-live="polite">Admin logged in. You can add books.</p>
         <button type="button" (click)="onLogout()">Logout</button>
       </div>
+
+      <form class="csv-upload-form" (submit)="onCsvUploadSubmit($event)">
+        <h3>Bulk Upload from CSV</h3>
+        <p class="admin-hint">Upload a CSV with headers: title, author, isbn, category, floor, section, shelf, callnumber, status.</p>
+
+        <label class="csv-file-picker">
+          <span>CSV File</span>
+          <input type="file" accept=".csv,text/csv" (change)="onCsvFileSelected($event)" />
+        </label>
+
+        @if (selectedCsvFileName) {
+          <p class="csv-file-name">Selected: {{ selectedCsvFileName }}</p>
+        }
+
+        <div class="form-actions">
+          <button type="submit" [disabled]="isUploadingCsv()">{{ isUploadingCsv() ? 'Uploading...' : 'Upload CSV' }}</button>
+          <p class="form-message" [attr.data-state]="csvUploadState()" aria-live="polite">{{ csvUploadMessage() }}</p>
+        </div>
+      </form>
     }
 
     <form class="add-book-form" autocomplete="off" (submit)="onAddBookSubmit($event)">

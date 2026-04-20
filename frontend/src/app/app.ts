@@ -52,6 +52,22 @@ interface CreateBookPayload {
   status: 'available' | 'checked-out';
 }
 
+interface CsvImportRowError {
+  row: number;
+  errors: string[];
+}
+
+interface CsvImportErrorDetails {
+  totalRows?: number;
+  invalidRows?: number;
+  errors?: CsvImportRowError[];
+}
+
+interface CsvImportResponse {
+  insertedCount: number;
+  totalRows: number;
+}
+
 @Component({
   selector: 'app-root',
   imports: [CommonModule, FormsModule],
@@ -78,12 +94,16 @@ export class App implements OnInit {
   protected readonly adminAuthState = signal<MessageState>('');
   protected readonly addBookMessage = signal('Admin login required to add a book.');
   protected readonly addBookState = signal<MessageState>('');
+  protected readonly csvUploadMessage = signal('Admin login required to upload CSV files.');
+  protected readonly csvUploadState = signal<MessageState>('');
+  protected readonly isUploadingCsv = signal(false);
 
   protected searchQuery = '';
   protected selectedCategory = '';
 
   protected adminUsername = '';
   protected adminPassword = '';
+  protected selectedCsvFileName = '';
 
   protected readonly newBook: CreateBookPayload = {
     title: '',
@@ -99,6 +119,7 @@ export class App implements OnInit {
 
   private adminToken = '';
   private tokenExpiryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private selectedCsvFile: File | null = null;
 
   async ngOnInit(): Promise<void> {
     this.restoreSession();
@@ -138,6 +159,8 @@ export class App implements OnInit {
       this.isAdminLoggedIn.set(true);
       this.addBookMessage.set('');
       this.addBookState.set('');
+      this.csvUploadMessage.set('');
+      this.csvUploadState.set('');
     } catch (error) {
       this.adminAuthMessage.set(this.getErrorMessage(error, 'Admin login failed.'));
       this.adminAuthState.set('error');
@@ -145,6 +168,8 @@ export class App implements OnInit {
       this.adminToken = '';
       this.addBookMessage.set('Admin login required to add a book.');
       this.addBookState.set('');
+      this.csvUploadMessage.set('Admin login required to upload CSV files.');
+      this.csvUploadState.set('');
     }
   }
 
@@ -157,6 +182,10 @@ export class App implements OnInit {
     this.adminAuthState.set('');
     this.addBookMessage.set('Admin login required to add a book.');
     this.addBookState.set('');
+    this.csvUploadMessage.set('Admin login required to upload CSV files.');
+    this.csvUploadState.set('');
+    this.selectedCsvFile = null;
+    this.selectedCsvFileName = '';
   }
 
   protected async onAddBookSubmit(event: Event): Promise<void> {
@@ -191,6 +220,53 @@ export class App implements OnInit {
     }
   }
 
+  protected onCsvFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.item(0) ?? null;
+
+    this.selectedCsvFile = file;
+    this.selectedCsvFileName = file?.name || '';
+    this.csvUploadState.set('');
+
+    if (file) {
+      this.csvUploadMessage.set(`Selected file: ${file.name}`);
+    } else if (this.isAdminLoggedIn()) {
+      this.csvUploadMessage.set('Select a CSV file to upload.');
+    } else {
+      this.csvUploadMessage.set('Admin login required to upload CSV files.');
+    }
+  }
+
+  protected async onCsvUploadSubmit(event: Event): Promise<void> {
+    event.preventDefault();
+
+    if (!this.selectedCsvFile) {
+      this.csvUploadState.set('error');
+      this.csvUploadMessage.set('Choose a CSV file before uploading.');
+      return;
+    }
+
+    this.isUploadingCsv.set(true);
+    this.csvUploadState.set('');
+    this.csvUploadMessage.set('Uploading CSV and importing books...');
+
+    try {
+      const result = await this.importBooksCsv(this.selectedCsvFile);
+      await this.loadCategories();
+      await this.refreshCatalog();
+
+      this.csvUploadState.set('success');
+      this.csvUploadMessage.set(`Imported ${result.insertedCount} of ${result.totalRows} row(s).`);
+      this.selectedCsvFile = null;
+      this.selectedCsvFileName = '';
+    } catch (error) {
+      this.csvUploadState.set('error');
+      this.csvUploadMessage.set(this.formatCsvImportError(error));
+    } finally {
+      this.isUploadingCsv.set(false);
+    }
+  }
+
   private restoreSession(): void {
     if (!isPlatformBrowser(this.platformId)) {
       return;
@@ -215,6 +291,8 @@ export class App implements OnInit {
     if (token) {
       this.addBookMessage.set('');
       this.addBookState.set('');
+      this.csvUploadMessage.set('');
+      this.csvUploadState.set('');
     }
   }
 
@@ -329,6 +407,34 @@ export class App implements OnInit {
     }
   }
 
+  private async importBooksCsv(file: File): Promise<CsvImportResponse> {
+    if (!this.adminToken) {
+      throw new Error('Admin login required to upload CSV files.');
+    }
+
+    const headers = new HttpHeaders({
+      Authorization: `Bearer ${this.adminToken}`
+    });
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      return await firstValueFrom(
+        this.http.post<CsvImportResponse>(`${App.API_BASE}/books/import/csv`, formData, {
+          headers
+        })
+      );
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        this.markSessionExpired();
+        throw new Error('Session expired. Please sign in again.');
+      }
+
+      throw error;
+    }
+  }
+
   private resetNewBookForm(): void {
     this.newBook.title = '';
     this.newBook.author = '';
@@ -362,6 +468,27 @@ export class App implements OnInit {
     return fallback;
   }
 
+  private formatCsvImportError(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      const details = error.error?.details as CsvImportErrorDetails | undefined;
+      const rowErrors = Array.isArray(details?.errors) ? details.errors : [];
+
+      if (rowErrors.length > 0) {
+        const sample = rowErrors
+          .slice(0, 3)
+          .map((rowError) => `Row ${rowError.row}: ${rowError.errors.join(', ')}`)
+          .join(' | ');
+
+        const moreCount = rowErrors.length > 3 ? ` (+${rowErrors.length - 3} more)` : '';
+        return `CSV validation failed. ${sample}${moreCount}`;
+      }
+
+      return this.getErrorMessage(error, 'CSV upload failed.');
+    }
+
+    return this.getErrorMessage(error, 'CSV upload failed.');
+  }
+
   private clearSession(): void {
     this.adminToken = '';
     this.isAdminLoggedIn.set(false);
@@ -382,6 +509,10 @@ export class App implements OnInit {
     this.adminAuthState.set('error');
     this.addBookMessage.set('Session expired. Please sign in again.');
     this.addBookState.set('error');
+    this.csvUploadMessage.set('Session expired. Please sign in again.');
+    this.csvUploadState.set('error');
+    this.selectedCsvFile = null;
+    this.selectedCsvFileName = '';
   }
 
   private isTokenExpired(token: string): boolean {

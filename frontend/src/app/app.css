@@ -311,6 +311,47 @@
 	background: #ffffff;
 }
 
+.csv-upload-form {
+	display: grid;
+	gap: 0.7rem;
+	padding: 0.8rem;
+	border: 1px solid var(--border);
+	border-radius: 0.85rem;
+	background: rgba(255, 255, 255, 0.72);
+	margin-bottom: 0.9rem;
+}
+
+.csv-upload-form h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+}
+
+.csv-file-picker {
+	display: grid;
+	gap: 0.35rem;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+.csv-file-picker input {
+	border: 1px dashed var(--border);
+	border-radius: 0.75rem;
+	padding: 0.65rem;
+	background: #ffffff;
+}
+
+.csv-file-picker input:focus {
+	outline: 2px solid rgba(224, 93, 63, 0.35);
+	border-color: var(--accent);
+}
+
+.csv-file-name {
+	margin: 0;
+	font-size: 0.86rem;
+	color: var(--muted);
+}
+
 .add-book-form {
 	display: grid;
 	gap: 0.8rem;
