@@ -17,7 +17,13 @@ function createApp(bookController, authController, requireAdminAuth) {
   app.use((error, _req, res, _next) => {
     const status = error.status || 500;
     const message = error.message || "Internal server error";
-    res.status(status).json({ error: message });
+
+    const payload = { error: message };
+    if (error.details) {
+      payload.details = error.details;
+    }
+
+    res.status(status).json(payload);
   });
 
   return app;

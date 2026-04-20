@@ -1,53 +1,41 @@
 import { seedBooks } from "../data/seedBooks.js";
-
-async function createSchema(db) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS books (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      author TEXT NOT NULL,
-      isbn TEXT NOT NULL UNIQUE,
-      category TEXT NOT NULL,
-      floor TEXT NOT NULL,
-      section TEXT NOT NULL,
-      shelf TEXT NOT NULL,
-      call_number TEXT NOT NULL,
-      status TEXT DEFAULT "available",
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-}
+import { count } from "drizzle-orm";
+import { books } from "../db/schema.js";
 
 async function seedIfEmpty(db) {
-  const { count } = await db.get("SELECT COUNT(*) as count FROM books");
-  if (count > 0) {
+  const [{ value }] = await db.select({ value: count() }).from(books);
+
+  if (value > 0) {
     return;
   }
 
-  const insertSQL = `
-    INSERT INTO books (
-      title, author, isbn, category, floor, section, shelf, call_number, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  for (const book of seedBooks) {
-    await db.run(insertSQL, [
-      book.title,
-      book.author,
-      book.isbn,
-      book.category,
-      book.floor,
-      book.section,
-      book.shelf,
-      book.callNumber,
-      book.status
-    ]);
-  }
+  await db.insert(books).values(
+    seedBooks.map((book) => ({
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn,
+      category: book.category,
+      floor: book.floor,
+      section: book.section,
+      shelf: book.shelf,
+      callNumber: book.callNumber,
+      status: book.status || "available"
+    }))
+  );
 }
 
 async function initializeDatabase(db) {
-  await createSchema(db);
-  await seedIfEmpty(db);
+  try {
+    await seedIfEmpty(db);
+  } catch (error) {
+    if (error?.code === "42P01") {
+      throw new Error(
+        "Database schema is missing. Run Drizzle migrations before starting the API."
+      );
+    }
+
+    throw error;
+  }
 }
 
 export { initializeDatabase };

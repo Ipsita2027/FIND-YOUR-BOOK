@@ -1,19 +1,17 @@
-import path from "path";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import "dotenv/config";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import { books } from "../db/schema.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+function connectDatabase() {
+  const databaseUrl = process.env.DATABASE_URL;
 
-const DB_PATH = path.join(__dirname, "..", "..", "library.db");
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required to connect to Neon Postgres.");
+  }
 
-async function connectDatabase() {
-  return open({
-    filename: DB_PATH,
-    driver: sqlite3.Database
-  });
+  const client = neon(databaseUrl);
+  return drizzle(client, { schema: { books } });
 }
 
 export { connectDatabase };

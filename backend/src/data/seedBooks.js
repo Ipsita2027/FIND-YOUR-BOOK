@@ -7,7 +7,7 @@ const seedBooks = [
     floor: "2",
     section: "Personal Growth",
     shelf: "PG-04",
-    callNumber: "158.1 CLE",
+
   },
   {
     title: "1984",
@@ -17,7 +17,7 @@ const seedBooks = [
     floor: "1",
     section: "Literature",
     shelf: "FIC-12",
-    callNumber: "823.912 ORW",
+
   },
   {
     title: "A Brief History of Time",
@@ -27,7 +27,7 @@ const seedBooks = [
     floor: "3",
     section: "Physics",
     shelf: "SCI-07",
-    callNumber: "523.1 HAW",
+
   },
   {
     title: "Sapiens",
@@ -37,7 +37,7 @@ const seedBooks = [
     floor: "2",
     section: "World History",
     shelf: "HIS-03",
-    callNumber: "909 HAR",
+
   },
   {
     title: "Clean Code",
@@ -47,7 +47,7 @@ const seedBooks = [
     floor: "3",
     section: "Software Engineering",
     shelf: "TECH-09",
-    callNumber: "005.1 MAR",
+
   },
   {
     title: "The Psychology of Money",
@@ -57,7 +57,7 @@ const seedBooks = [
     floor: "2",
     section: "Business",
     shelf: "BUS-05",
-    callNumber: "332.4 HOU",
+
   },
   {
     title: "The Pragmatic Programmer",
@@ -67,7 +67,7 @@ const seedBooks = [
     floor: "3",
     section: "Software Engineering",
     shelf: "TECH-10",
-    callNumber: "005.1 HUN",
+
   },
   {
     title: "Thinking, Fast and Slow",
@@ -77,7 +77,7 @@ const seedBooks = [
     floor: "2",
     section: "Behavioral Science",
     shelf: "PSY-02",
-    callNumber: "153.4 KAH",
+
   }
 ];
 

@@ -1,4 +1,6 @@
 import { mapBookRow } from "../utils/bookMapper.js";
+import { asc } from "drizzle-orm";
+import { books } from "../db/schema.js";
 
 class BookRepository {
   constructor(db) {
@@ -6,36 +8,31 @@ class BookRepository {
   }
 
   async getAllBooks() {
-    const rows = await this.db.all("SELECT * FROM books");
+    const rows = await this.db.select().from(books);
     return rows.map(mapBookRow);
   }
 
   async getCategories() {
-    const rows = await this.db.all("SELECT DISTINCT category FROM books ORDER BY category ASC");
+    const rows = await this.db
+      .selectDistinct({ category: books.category })
+      .from(books)
+      .orderBy(asc(books.category));
+
     return rows.map((row) => row.category);
   }
 
   async createBook(book) {
-    const result = await this.db.run(
-      `
-        INSERT INTO books (title, author, isbn, category, floor, section, shelf, call_number, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        book.title,
-        book.author,
-        book.isbn,
-        book.category,
-        book.floor,
-        book.section,
-        book.shelf,
-        book.callNumber,
-        book.status
-      ]
-    );
-
-    const row = await this.db.get("SELECT * FROM books WHERE id = ?", [result.lastID]);
+    const [row] = await this.db.insert(books).values(book).returning();
     return mapBookRow(row);
+  }
+
+  async createBooksBulk(bookRows) {
+    if (!Array.isArray(bookRows) || bookRows.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db.insert(books).values(bookRows).returning();
+    return rows.map(mapBookRow);
   }
 }
 

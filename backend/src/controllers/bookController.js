@@ -6,6 +6,7 @@ class BookController {
     this.getCategories = this.getCategories.bind(this);
     this.getBooks = this.getBooks.bind(this);
     this.createBook = this.createBook.bind(this);
+    this.importBooksFromCsv = this.importBooksFromCsv.bind(this);
   }
   // Below are the route handlers for this controller(3 of them)
   async getCategories(_req, res, next) {
@@ -36,6 +37,15 @@ class BookController {
     try {
       const book = await this.bookService.addBook(req.body || {});
       res.status(201).json(book);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async importBooksFromCsv(req, res, next) {
+    try {
+      const result = await this.bookService.importBooksFromCsv(req.file);
+      res.status(201).json(result);
     } catch (error) {
       next(error);
     }
