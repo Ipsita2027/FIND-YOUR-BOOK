@@ -11,7 +11,7 @@ function createApp(bookController, authController, requireAdminAuth) {
   app.use(express.json());
 
   app.use("/api", createHealthRoutes());
-  app.use("/api", createAuthRoutes(authController));
+  app.use("/api", createAuthRoutes(authController, requireAdminAuth));
   app.use("/api", createBookRoutes(bookController, requireAdminAuth));
 
   app.use((error, _req, res, _next) => {

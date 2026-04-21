@@ -1,7 +1,9 @@
 import { connectDatabase } from "./config/database.js";
 import { initializeDatabase } from "./config/databaseSetup.js";
 import { createBookRepository } from "./repositories/bookRepository.js";
+import { createAdminRepository } from "./repositories/adminRepository.js";
 import { createBookService } from "./services/bookService.js";
+import { createAdminService } from "./services/adminService.js";
 import { createBookController } from "./controllers/bookController.js";
 import { createAuthController } from "./controllers/authController.js";
 import { createApp } from "./app.js";
@@ -15,12 +17,14 @@ async function startServer() {
   await initializeDatabase(db);
 
   const bookRepository = createBookRepository(db);
+  const adminRepository = createAdminRepository(db);
+  const adminService = createAdminService(adminRepository);
+  const adminAuth = createAdminAuth({ adminService });
   const bookSearchIndex = createBookSearchIndex();
   const bookService = createBookService(bookRepository, bookSearchIndex);
   await bookService.initialize();
   const bookController = createBookController(bookService);
-  const adminAuth = createAdminAuth();
-  const authController = createAuthController(adminAuth);
+  const authController = createAuthController(adminAuth, adminService);
 
   const app = createApp(bookController, authController, adminAuth.requireAdminAuth);
 

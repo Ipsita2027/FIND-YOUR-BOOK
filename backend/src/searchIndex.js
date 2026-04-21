@@ -76,11 +76,11 @@ function similarityScore(a, b) {
 }
 
 class BookSearchIndex {
-  constructor() {
+  constructor(books = []) {
     this.books = [];
     this.booksById = new Map();
     this.index = new Map();
-    // this.setBooks(books);
+    this.setBooks(books);
   }
 
   static getInstance(books = []) {

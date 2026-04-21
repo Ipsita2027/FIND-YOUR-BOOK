@@ -39,14 +39,14 @@ function createHttpError(status, message) {
 }
 
 class BookService {
-  constructor(bookRepository,bookSearchIndex) {
+  constructor(bookRepository, bookSearchIndex) {
     this.bookRepository = bookRepository;
     this.index = bookSearchIndex;
   }
 
   async refreshSearchIndex() {
     const books = await this.bookRepository.getAllBooks();
-    this.index.setBooks(books);
+    await this.index.setBooks(books);
   }
 
   validateCreateBookInput(payload) {
@@ -185,7 +185,7 @@ class BookService {
 
     try {
       const created = await this.bookRepository.createBook(validated);
-      this.index.addBook(created);
+      await this.index.addBook(created);
       return created;
     } catch (error) {
       if (error?.code === "23505" || String(error.message).includes("books_isbn")) {
@@ -212,7 +212,9 @@ class BookService {
 
     try {
       const inserted = await this.bookRepository.createBooksBulk(validRows);
-      await this.refreshSearchIndex();
+      for (const book of inserted) {
+        await this.index.addBook(book);
+      }
 
       return {
         insertedCount: inserted.length,

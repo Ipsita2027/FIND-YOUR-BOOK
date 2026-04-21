@@ -16,9 +16,8 @@ function base64UrlDecode(value) {
 
 function createAdminAuth(config = {}) {
     const secret = String(config.secret || process.env.ADMIN_TOKEN_SECRET || "find-your-book-dev-secret");
-    const adminUsername = String(config.adminUsername || process.env.ADMIN_USERNAME || "admin");
-    const adminPassword = String(config.adminPassword || process.env.ADMIN_PASSWORD || "admin123");
     const tokenTtlSeconds = Number(config.tokenTtlSeconds || process.env.ADMIN_TOKEN_TTL_SECONDS || 3600);
+    const adminService = config.adminService;
 
     function signPayload(encodedPayload) {
         return crypto
@@ -27,10 +26,10 @@ function createAdminAuth(config = {}) {
             .digest("base64url");
     }
 
-    function issueToken() {
+    function issueToken(username) {
         const exp = Math.floor(Date.now() / 1000) + tokenTtlSeconds;
         const payload = {
-            sub: adminUsername,
+            sub: username,
             role: "admin",
             exp
         };
@@ -65,8 +64,12 @@ function createAdminAuth(config = {}) {
         return payload;
     }
 
-    function validateAdminCredentials(username, password) {
-        return String(username || "") === adminUsername && String(password || "") === adminPassword;
+    async function validateCredentials(username, password) {
+        if (!adminService) {
+            throw new Error("AdminService not configured in auth middleware.");
+        }
+
+        return adminService.validateCredentials(username, password);
     }
 
     function requireAdminAuth(req, _res, next) {
@@ -84,9 +87,8 @@ function createAdminAuth(config = {}) {
     return {
         issueToken,
         requireAdminAuth,
-        validateAdminCredentials,
-        tokenTtlSeconds,
-        adminUsername
+        validateCredentials,
+        tokenTtlSeconds
     };
 }
 

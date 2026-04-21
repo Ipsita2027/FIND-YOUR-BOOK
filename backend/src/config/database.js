@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { books } from "../db/schema.js";
+import { books, admins } from "../db/schema.js";
 
 function connectDatabase() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -11,7 +11,7 @@ function connectDatabase() {
   }
 
   const client = neon(databaseUrl);
-  return drizzle(client, { schema: { books } });
+  return drizzle(client, { schema: { books, admins } });
 }
 
 export { connectDatabase };

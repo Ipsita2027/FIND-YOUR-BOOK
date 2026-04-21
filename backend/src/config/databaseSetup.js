@@ -1,6 +1,7 @@
 import { seedBooks } from "../data/seedBooks.js";
-import { count } from "drizzle-orm";
-import { books } from "../db/schema.js";
+import { count, eq } from "drizzle-orm";
+import { books, admins } from "../db/schema.js";
+import bcrypt from "bcrypt";
 
 async function seedIfEmpty(db) {
   const [{ value }] = await db.select({ value: count() }).from(books);
@@ -24,9 +25,31 @@ async function seedIfEmpty(db) {
   );
 }
 
+async function seedAdminIfNotExists(db) {
+  const adminUsername = String(process.env.ADMIN_USERNAME || "admin");
+  const adminPassword = String(process.env.ADMIN_PASSWORD || "admin123");
+
+  const existing = await db
+    .select()
+    .from(admins)
+    .where(eq(admins.username, adminUsername));
+
+  if (existing && existing.length > 0) {
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
+
+  await db.insert(admins).values({
+    username: adminUsername,
+    passwordHash
+  });
+}
+
 async function initializeDatabase(db) {
   try {
     await seedIfEmpty(db);
+    await seedAdminIfNotExists(db);
   } catch (error) {
     if (error?.code === "42P01") {
       throw new Error(
