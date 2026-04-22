@@ -21,7 +21,6 @@
 //       floor TEXT NOT NULL,
 //       section TEXT NOT NULL,
 //       shelf TEXT NOT NULL,
-//       call_number TEXT NOT NULL,
 //       created_at TEXT DEFAULT CURRENT_TIMESTAMP
 //     );
 //   `);
@@ -30,8 +29,8 @@
 //   if (count === 0) {
 //     const insertSQL = `
 //       INSERT INTO books (
-//         title, author, isbn, category, floor, section, shelf, call_number
-//       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+//         title, author, isbn, category, floor, section, shelf
+//       ) VALUES (?, ?, ?, ?, ?, ?, ?)
 //     `;
 
 //     for (const book of seedBooks) {
@@ -43,7 +42,6 @@
 //         book.floor,
 //         book.section,
 //         book.shelf,
-//         book.callNumber,
 //       ]);
 //     }
 //   }
@@ -61,8 +59,7 @@
 //     location: {
 //       floor: row.floor,
 //       section: row.section,
-//       shelf: row.shelf,
-//       callNumber: row.call_number
+//       shelf: row.shelf
 //     },
 //   };
 // }

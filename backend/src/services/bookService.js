@@ -3,7 +3,7 @@ import { createBookPayloadSchema } from "../validation/bookSchemas.js";
 import { parse } from "csv-parse/sync";
 
 const MAX_IMPORT_ROWS = 2000;
-const REQUIRED_COLUMNS = ["title", "author", "isbn", "category", "floor", "section", "shelf", "callnumber"];
+const REQUIRED_COLUMNS = ["title", "author", "isbn", "category", "floor", "section", "shelf"];
 const OPTIONAL_COLUMNS = ["status"];
 const ALLOWED_COLUMNS = new Set([...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS]);
 
@@ -23,7 +23,6 @@ function toCanonicalRecord(record) {
     floor: record.floor,
     section: record.section,
     shelf: record.shelf,
-    callNumber: record.callnumber,
     status: record.status
   };
 }
@@ -50,7 +49,18 @@ class BookService {
   }
 
   validateCreateBookInput(payload) {
-    const parsed = createBookPayloadSchema.safeParse(payload);
+    const candidate = {
+      title: payload?.title,
+      author: payload?.author,
+      isbn: payload?.isbn,
+      category: payload?.category,
+      floor: payload?.floor,
+      section: payload?.section,
+      shelf: payload?.shelf,
+      status: payload?.status
+    };
+
+    const parsed = createBookPayloadSchema.safeParse(candidate);
 
     if (!parsed.success) {
       const details = parsed.error.issues.map((issue) => issue.message).join("; ");

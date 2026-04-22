@@ -19,7 +19,6 @@ async function seedIfEmpty(db) {
       floor: book.floor,
       section: book.section,
       shelf: book.shelf,
-      callNumber: book.callNumber,
       status: book.status || "available"
     }))
   );

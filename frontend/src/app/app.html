@@ -61,10 +61,6 @@
               <dt>Shelf</dt>
               <dd>{{ book.location.shelf }}</dd>
             </div>
-            <div>
-              <dt>Call Number</dt>
-              <dd>{{ book.location.callNumber }}</dd>
-            </div>
           </dl>
           <p class="availability" [attr.data-state]="book.status">Status: {{ book.status }}</p>
         </article>
@@ -167,7 +163,7 @@
 
       <form class="csv-upload-form" (submit)="onCsvUploadSubmit($event)">
         <h3>Bulk Upload from CSV</h3>
-        <p class="admin-hint">Upload a CSV with headers: title, author, isbn, category, floor, section, shelf, callnumber, status.</p>
+        <p class="admin-hint">Upload a CSV with headers: title, author, isbn, category, floor, section, shelf, status.</p>
 
         <label class="csv-file-picker">
           <span>CSV File</span>
@@ -214,10 +210,6 @@
         <label>
           <span>Shelf</span>
           <input name="shelf" type="text" [(ngModel)]="newBook.shelf" required />
-        </label>
-        <label>
-          <span>Call Number</span>
-          <input name="callNumber" type="text" [(ngModel)]="newBook.callNumber" required />
         </label>
         <label>
           <span>Status</span>

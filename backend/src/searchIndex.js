@@ -21,8 +21,7 @@ function uniqueTermsFromBook(book) {
     ...tokenize(book.isbn),
     ...tokenize(book.category),
     ...tokenize(book.location.section),
-    ...tokenize(book.location.shelf),
-    ...tokenize(book.location.callNumber)
+    ...tokenize(book.location.shelf)
   ]);
 
   return [...terms];
@@ -186,8 +185,7 @@ class BookSearchIndex {
         book.author,
         book.isbn,
         book.category,
-        book.location.section,
-        book.location.callNumber
+        book.location.section
       ].join(" "));
 
       if (normalizeText(query) && fullText.includes(normalizeText(query))) {

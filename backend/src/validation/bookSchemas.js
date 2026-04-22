@@ -12,11 +12,16 @@ const createBookPayloadSchema = createInsertSchema(books, {
   floor: () => nonEmptyText("floor", 32),
   section: () => nonEmptyText("section"),
   shelf: () => nonEmptyText("shelf", 32),
-  callNumber: () => nonEmptyText("callNumber", 64),
   status: () => z.enum(["available", "checked-out"]).default("available")
-}).omit({
-  id: true,
-  createdAt: true
+}).pick({
+  title: true,
+  author: true,
+  isbn: true,
+  category: true,
+  floor: true,
+  section: true,
+  shelf: true,
+  status: true
 });
 
 export { createBookPayloadSchema };

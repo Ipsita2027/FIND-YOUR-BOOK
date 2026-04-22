@@ -94,7 +94,6 @@ This endpoint now requires an admin bearer token.
   "floor": "2",
   "section": "Personal Growth",
   "shelf": "PG-06",
-  "callNumber": "153.3 NEW",
   "status": "available"
 }
 ```

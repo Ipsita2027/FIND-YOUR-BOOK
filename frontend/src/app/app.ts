@@ -10,7 +10,6 @@ interface BookLocation {
   floor: string;
   section: string;
   shelf: string;
-  callNumber: string;
 }
 
 interface Book {
@@ -56,7 +55,6 @@ interface CreateBookPayload {
   floor: string;
   section: string;
   shelf: string;
-  callNumber: string;
   status: 'available' | 'checked-out';
 }
 
@@ -128,7 +126,6 @@ export class App implements OnInit {
     floor: '',
     section: '',
     shelf: '',
-    callNumber: '',
     status: 'available'
   };
 
@@ -251,17 +248,7 @@ export class App implements OnInit {
     this.addBookState.set('');
 
     try {
-      const payload = {
-        ...this.newBook,
-        title: this.newBook.title.trim(),
-        author: this.newBook.author.trim(),
-        isbn: this.newBook.isbn.trim(),
-        category: this.newBook.category.trim(),
-        floor: this.newBook.floor.trim(),
-        section: this.newBook.section.trim(),
-        shelf: this.newBook.shelf.trim(),
-        callNumber: this.newBook.callNumber.trim()
-      };
+      const payload = this.toCreateBookPayload(this.newBook);
 
       await this.createBook(payload);
       this.resetNewBookForm();
@@ -504,10 +491,11 @@ export class App implements OnInit {
     }
 
     const headers = this.createAuthHeaders();
+    const createPayload = this.toCreateBookPayload(payload);
 
     try {
       await firstValueFrom(
-        this.http.post<Book>(`${App.API_BASE}/books`, payload, {
+        this.http.post<Book>(`${App.API_BASE}/books`, createPayload, {
           headers
         })
       );
@@ -555,8 +543,20 @@ export class App implements OnInit {
     this.newBook.floor = '';
     this.newBook.section = '';
     this.newBook.shelf = '';
-    this.newBook.callNumber = '';
     this.newBook.status = 'available';
+  }
+
+  private toCreateBookPayload(source: CreateBookPayload): CreateBookPayload {
+    return {
+      title: source.title.trim(),
+      author: source.author.trim(),
+      isbn: source.isbn.trim(),
+      category: source.category.trim(),
+      floor: source.floor.trim(),
+      section: source.section.trim(),
+      shelf: source.shelf.trim(),
+      status: source.status
+    };
   }
 
   private getErrorMessage(error: unknown, fallback: string): string {

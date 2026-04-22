@@ -1,6 +1,4 @@
 function mapBookRow(row) {
-  const callNumber = row.callNumber ?? row.call_number;
-
   return {
     id: row.id,
     title: row.title,
@@ -11,8 +9,7 @@ function mapBookRow(row) {
     location: {
       floor: row.floor,
       section: row.section,
-      shelf: row.shelf,
-      callNumber
+      shelf: row.shelf
     },
   };
 }
