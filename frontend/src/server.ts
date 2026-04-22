@@ -6,11 +6,68 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
+const backendApiBaseUrl = process.env['BACKEND_API_URL'] || 'http://localhost:4000';
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
+
+app.use('/api', async (req, res, next) => {
+  try {
+    const targetUrl = new URL(req.originalUrl, backendApiBaseUrl);
+    const headers = new Headers();
+
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (typeof value === 'undefined') {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        headers.set(key, value.join(', '));
+      } else {
+        headers.set(key, value);
+      }
+    }
+
+    headers.set('x-forwarded-host', req.get('host') || '');
+    headers.set('x-forwarded-proto', req.protocol);
+
+    const requestBody =
+      req.method === 'GET' || req.method === 'HEAD'
+        ? undefined
+        : (Readable.toWeb(req) as unknown as BodyInit);
+    const requestInit: RequestInit & { duplex?: 'half' } = {
+      method: req.method,
+      headers,
+      body: requestBody,
+      duplex: req.method === 'GET' || req.method === 'HEAD' ? undefined : 'half',
+    };
+
+    const response = await fetch(targetUrl, requestInit);
+
+    res.status(response.status);
+
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'transfer-encoding') {
+        return;
+      }
+
+      res.setHeader(key, value);
+    });
+
+    if (!response.body) {
+      res.end();
+      return;
+    }
+
+    Readable.fromWeb(response.body as NodeReadableStream).pipe(res);
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * Example Express Rest API endpoints can be defined here.

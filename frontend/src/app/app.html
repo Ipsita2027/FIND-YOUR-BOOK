@@ -116,9 +116,54 @@
 
     @if (isAdminLoggedIn()) {
       <div class="admin-session-panel">
-        <p class="form-message" aria-live="polite">Admin logged in. You can add books.</p>
+        <p class="form-message" aria-live="polite">
+          Signed in as <strong>{{ activeAdminUsername || 'admin' }}</strong>. You can add books and manage your password.
+        </p>
         <button type="button" (click)="onLogout()">Logout</button>
       </div>
+
+      <form class="password-change-form" autocomplete="off" (submit)="onChangePasswordSubmit($event)">
+        <h3>Change Password</h3>
+        <div class="password-grid">
+          <label>
+            <span>Current Password</span>
+            <input name="currentPassword" type="password" [(ngModel)]="currentPassword" required />
+          </label>
+          <label>
+            <span>New Password</span>
+            <input name="nextPassword" type="password" [(ngModel)]="nextPassword" minlength="8" required />
+          </label>
+          <label>
+            <span>Confirm New Password</span>
+            <input
+              name="confirmNextPassword"
+              type="password"
+              [(ngModel)]="confirmNextPassword"
+              minlength="8"
+              required
+            />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit">Update Password</button>
+          <p class="form-message" [attr.data-state]="passwordChangeState()" aria-live="polite">
+            {{ passwordChangeMessage() }}
+          </p>
+        </div>
+      </form>
+
+      <section class="admins-list" aria-live="polite">
+        <h3>Registered Admins</h3>
+        @if (adminUsers().length > 0) {
+          <ul>
+            @for (adminUser of adminUsers(); track adminUser.id) {
+              <li>{{ adminUser.username }}</li>
+            }
+          </ul>
+        } @else {
+          <p class="admin-hint">No admins available.</p>
+        }
+      </section>
 
       <form class="csv-upload-form" (submit)="onCsvUploadSubmit($event)">
         <h3>Bulk Upload from CSV</h3>

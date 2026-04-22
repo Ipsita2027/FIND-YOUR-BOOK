@@ -37,7 +37,15 @@ interface LoginResponse {
 }
 
 interface AuthTokenPayload {
+  sub?: string;
   exp?: number;
+}
+
+interface AdminSummary {
+  id: number;
+  username: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface CreateBookPayload {
@@ -78,7 +86,7 @@ export class App implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly platformId = inject(PLATFORM_ID);
 
-  private static readonly API_BASE = 'http://localhost:4000/api';
+  private static readonly API_BASE = '/api';
   private static readonly ADMIN_TOKEN_STORAGE_KEY = 'find-your-book-admin-token';
 
   protected readonly title = signal('Find Your Book');
@@ -89,11 +97,14 @@ export class App implements OnInit {
   protected readonly isLoading = signal(false);
   protected readonly adminPanelVisible = signal(false);
   protected readonly isAdminLoggedIn = signal(false);
+  protected readonly adminUsers = signal<AdminSummary[]>([]);
 
   protected readonly adminAuthMessage = signal('');
   protected readonly adminAuthState = signal<MessageState>('');
   protected readonly addBookMessage = signal('Admin login required to add a book.');
   protected readonly addBookState = signal<MessageState>('');
+  protected readonly passwordChangeMessage = signal('');
+  protected readonly passwordChangeState = signal<MessageState>('');
   protected readonly csvUploadMessage = signal('Admin login required to upload CSV files.');
   protected readonly csvUploadState = signal<MessageState>('');
   protected readonly isUploadingCsv = signal(false);
@@ -101,8 +112,12 @@ export class App implements OnInit {
   protected searchQuery = '';
   protected selectedCategory = '';
 
+  protected activeAdminUsername = '';
   protected adminUsername = '';
   protected adminPassword = '';
+  protected currentPassword = '';
+  protected nextPassword = '';
+  protected confirmNextPassword = '';
   protected selectedCsvFileName = '';
 
   protected readonly newBook: CreateBookPayload = {
@@ -159,15 +174,23 @@ export class App implements OnInit {
       this.isAdminLoggedIn.set(true);
       this.addBookMessage.set('');
       this.addBookState.set('');
+      this.passwordChangeMessage.set('');
+      this.passwordChangeState.set('');
       this.csvUploadMessage.set('');
       this.csvUploadState.set('');
+
+      await this.loadAdmins();
     } catch (error) {
       this.adminAuthMessage.set(this.getErrorMessage(error, 'Admin login failed.'));
       this.adminAuthState.set('error');
       this.isAdminLoggedIn.set(false);
       this.adminToken = '';
+      this.activeAdminUsername = '';
+      this.adminUsers.set([]);
       this.addBookMessage.set('Admin login required to add a book.');
       this.addBookState.set('');
+      this.passwordChangeMessage.set('');
+      this.passwordChangeState.set('');
       this.csvUploadMessage.set('Admin login required to upload CSV files.');
       this.csvUploadState.set('');
     }
@@ -177,15 +200,48 @@ export class App implements OnInit {
     this.clearSession();
     this.adminUsername = '';
     this.adminPassword = '';
+    this.currentPassword = '';
+    this.nextPassword = '';
+    this.confirmNextPassword = '';
+    this.activeAdminUsername = '';
+    this.adminUsers.set([]);
 
     this.adminAuthMessage.set('Logged out.');
     this.adminAuthState.set('');
     this.addBookMessage.set('Admin login required to add a book.');
     this.addBookState.set('');
+    this.passwordChangeMessage.set('');
+    this.passwordChangeState.set('');
     this.csvUploadMessage.set('Admin login required to upload CSV files.');
     this.csvUploadState.set('');
     this.selectedCsvFile = null;
     this.selectedCsvFileName = '';
+  }
+
+  protected async onChangePasswordSubmit(event: Event): Promise<void> {
+    event.preventDefault();
+
+    if (this.nextPassword !== this.confirmNextPassword) {
+      this.passwordChangeState.set('error');
+      this.passwordChangeMessage.set('New password and confirm password do not match.');
+      return;
+    }
+
+    this.passwordChangeState.set('');
+    this.passwordChangeMessage.set('Updating password...');
+
+    try {
+      await this.changePassword(this.currentPassword, this.nextPassword);
+
+      this.currentPassword = '';
+      this.nextPassword = '';
+      this.confirmNextPassword = '';
+      this.passwordChangeState.set('success');
+      this.passwordChangeMessage.set('Password changed successfully.');
+    } catch (error) {
+      this.passwordChangeState.set('error');
+      this.passwordChangeMessage.set(this.getErrorMessage(error, 'Failed to change password.'));
+    }
   }
 
   protected async onAddBookSubmit(event: Event): Promise<void> {
@@ -286,13 +342,19 @@ export class App implements OnInit {
 
     this.adminToken = token;
     this.isAdminLoggedIn.set(true);
+    const payload = this.decodeTokenPayload(token);
+    this.activeAdminUsername = payload?.sub || '';
     this.scheduleTokenExpiryCheck(token);
 
     if (token) {
       this.addBookMessage.set('');
       this.addBookState.set('');
+      this.passwordChangeMessage.set('');
+      this.passwordChangeState.set('');
       this.csvUploadMessage.set('');
       this.csvUploadState.set('');
+
+      void this.loadAdmins();
     }
   }
 
@@ -376,10 +438,64 @@ export class App implements OnInit {
     );
 
     this.adminToken = payload.token;
+    const tokenPayload = this.decodeTokenPayload(payload.token);
+    this.activeAdminUsername = tokenPayload?.sub || username;
+
     if (isPlatformBrowser(this.platformId)) {
       localStorage.setItem(App.ADMIN_TOKEN_STORAGE_KEY, payload.token);
     }
+
     this.scheduleTokenExpiryCheck(payload.token);
+  }
+
+  private async loadAdmins(): Promise<void> {
+    if (!this.adminToken) {
+      return;
+    }
+
+    const headers = this.createAuthHeaders();
+
+    try {
+      const admins = await firstValueFrom(
+        this.http.get<AdminSummary[]>(`${App.API_BASE}/auth/admins`, {
+          headers
+        })
+      );
+
+      this.adminUsers.set(admins);
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        this.markSessionExpired();
+      }
+    }
+  }
+
+  private async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    if (!this.adminToken) {
+      throw new Error('Admin login required to change password.');
+    }
+
+    const headers = this.createAuthHeaders();
+
+    try {
+      await firstValueFrom(
+        this.http.post<{ message: string }>(
+          `${App.API_BASE}/auth/change-password`,
+          {
+            oldPassword,
+            newPassword
+          },
+          { headers }
+        )
+      );
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        this.markSessionExpired();
+        throw new Error('Session expired. Please sign in again.');
+      }
+
+      throw error;
+    }
   }
 
   private async createBook(payload: CreateBookPayload): Promise<void> {
@@ -387,9 +503,7 @@ export class App implements OnInit {
       throw new Error('Admin login required to add a book.');
     }
 
-    const headers = new HttpHeaders({
-      Authorization: `Bearer ${this.adminToken}`
-    });
+    const headers = this.createAuthHeaders();
 
     try {
       await firstValueFrom(
@@ -412,9 +526,7 @@ export class App implements OnInit {
       throw new Error('Admin login required to upload CSV files.');
     }
 
-    const headers = new HttpHeaders({
-      Authorization: `Bearer ${this.adminToken}`
-    });
+    const headers = this.createAuthHeaders();
 
     const formData = new FormData();
     formData.append('file', file);
@@ -492,6 +604,8 @@ export class App implements OnInit {
   private clearSession(): void {
     this.adminToken = '';
     this.isAdminLoggedIn.set(false);
+    this.activeAdminUsername = '';
+    this.adminUsers.set([]);
 
     if (this.tokenExpiryTimeoutId) {
       clearTimeout(this.tokenExpiryTimeoutId);
@@ -509,6 +623,8 @@ export class App implements OnInit {
     this.adminAuthState.set('error');
     this.addBookMessage.set('Session expired. Please sign in again.');
     this.addBookState.set('error');
+    this.passwordChangeMessage.set('Session expired. Please sign in again.');
+    this.passwordChangeState.set('error');
     this.csvUploadMessage.set('Session expired. Please sign in again.');
     this.csvUploadState.set('error');
     this.selectedCsvFile = null;
@@ -568,5 +684,11 @@ export class App implements OnInit {
     this.tokenExpiryTimeoutId = setTimeout(() => {
       this.markSessionExpired();
     }, delayMs);
+  }
+
+  private createAuthHeaders(): HttpHeaders {
+    return new HttpHeaders({
+      Authorization: `Bearer ${this.adminToken}`
+    });
   }
 }

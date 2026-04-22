@@ -4,19 +4,19 @@ Library search system with a separate backend and frontend.
 
 ## Architecture
 
-- Frontend: static web app in `frontend/`
+- Frontend: Angular app in `frontend/`
 - Backend: Node.js + Express API in `backend/`
-- Database: SQLite (`backend/library.db`)
-- Search engine: Inverted index + fuzzy matching (Levenshtein similarity)
+- Database: Neon Postgres via Drizzle ORM
+- Search engine: Redis-backed exact, prefix, and fuzzy search index
 
 ## Features
 
-- Persist books in a database
+- Persist books in Postgres and index them in Redis
 - Admin login to protect write operations
 - Add books via API (`POST /api/books`) for authenticated admins only
 - Full catalog listing (`GET /api/books`)
 - Filter catalog by category (`GET /api/books?category=technology`)
-- Inverted index search with fuzzy logic for typos (`GET /api/books?query=atomc habits`)
+- Redis-backed search with exact, prefix, and fuzzy matching (`GET /api/books?query=atomc habits`)
 - Get all categories (`GET /api/categories`)
 
 ## Run Backend
@@ -31,9 +31,34 @@ Library search system with a separate backend and frontend.
 
 ## Run Frontend
 
-1. Open `frontend/index.html` in a browser
-2. Ensure backend is running on port 4000
-3. Search books and filter by category
+1. Open a terminal in `frontend/`
+2. Install dependencies:
+  - `npm install`
+3. Start Angular dev server:
+  - `npm start`
+4. Open:
+  - `http://localhost:4200`
+5. Ensure backend is running on port 4000 for API requests
+
+## Run With Docker
+
+1. Copy `.env.example` to `.env` and fill in `DATABASE_URL` plus your admin secret values.
+2. Start the stack:
+  - `docker compose up --build`
+3. Open the app:
+  - Frontend: `http://localhost:4200`
+  - Backend API: `http://localhost:4000/api`
+
+Docker services:
+
+- `frontend`: Angular SSR app, proxied to the backend through `/api`
+- `backend`: Express API
+
+Notes:
+
+- The backend still expects a Postgres-compatible `DATABASE_URL`.
+- Set `REDIS_URL` to your Redis Cloud connection string.
+- Your Redis Cloud database must have RediSearch enabled.
 
 ## API Examples
 
@@ -85,3 +110,10 @@ For production/testing, set environment variables before starting backend:
 - `ADMIN_PASSWORD`
 - `ADMIN_TOKEN_SECRET`
 - `ADMIN_TOKEN_TTL_SECONDS` (default `3600`)
+- `DATABASE_URL`
+- `REDIS_URL`
+
+Redis requirement:
+
+- Your Redis instance must have RediSearch enabled (Redis Stack or managed Redis with Search support).
+- If RediSearch is unavailable, backend startup will fail when creating the search index.
