@@ -35,10 +35,10 @@ class BookRepository {
     return rows.map(mapBookRow);
   }
 
-  async deleteBook(bookId) {
-    const result = await this.db.delete(books).where(books.id === bookId);
-    return result.rowCount > 0;
-  }
+//   async deleteBook(bookId) {
+//     const result = await this.db.delete(books).where(books.id === bookId);
+//     return result.rowCount > 0;
+//   }
 }
 
 function createBookRepository(db) {

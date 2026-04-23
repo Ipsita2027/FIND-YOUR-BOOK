@@ -78,13 +78,6 @@ Notes:
 
 `POST http://localhost:4000/api/books`
 
-This endpoint now requires an admin bearer token.
-
-1. Login as admin:
-  - `POST http://localhost:4000/api/auth/login-admin`
-2. Use returned `token` in header:
-  - `Authorization: Bearer <token>`
-
 ```json
 {
   "title": "Deep Work",
@@ -97,6 +90,29 @@ This endpoint now requires an admin bearer token.
   "status": "available"
 }
 ```
+
+### Add books via a CSV file
+
+`POST http://localhost:4000/api/books/import/csv`
+
+```type1.csv(with status column)
+title,author,isbn,category,floor,section,shelf,status
+An Introduction to Political Science,O.P. Gauba,9789388658331,Social Sciences,2,PolSci,4,available
+```
+
+```type2.csv(w/o status column)
+title,author,isbn,category,floor,section,shelf
+An Introduction to Political Science,O.P. Gauba,9789388658331,Social Sciences,2,PolSci,4
+```
+
+
+The POST book endpoints now requires an admin bearer token.
+
+1. Login as admin:
+  - `POST http://localhost:4000/api/auth/login-admin`
+2. Use returned `token` in header:
+  - `Authorization: Bearer <token>`
+
 
 ## Admin Credentials
 
