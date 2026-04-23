@@ -113,12 +113,6 @@ The POST book endpoints now requires an admin bearer token.
 2. Use returned `token` in header:
   - `Authorization: Bearer <token>`
 
-
-## Admin Credentials
-
-- Default username: `admin`
-- Default password: `admin123`
-
 For production/testing, set environment variables before starting backend:
 
 - `ADMIN_USERNAME`
