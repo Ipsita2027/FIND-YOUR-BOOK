@@ -206,6 +206,18 @@ class BookService {
     }
   }
 
+  async deleteBook(bookId) {
+    try {
+      // Delete from database (idempotent - doesn't fail if book doesn't exist)
+      await this.bookRepository.deleteBook(bookId);
+      
+      // Remove from search index (idempotent - only removes if present)
+      this.index.removeBook(bookId);
+    } catch (error) {
+      throw createHttpError(500, "Failed to delete book.");
+    }
+  }
+
   async importBooksFromCsv(file) {
     const records = this.parseCsvFile(file);
     const { errors, validRows } = this.validateImportRows(records);

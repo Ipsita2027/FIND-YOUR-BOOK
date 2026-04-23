@@ -7,6 +7,7 @@ function createBookRoutes(bookController, requireAdminAuth) {
   router.get("/categories", bookController.getCategories);
   router.get("/books", bookController.getBooks);
   router.post("/books", requireAdminAuth, bookController.createBook);
+  router.delete("/books/:id", requireAdminAuth, bookController.deleteBook);
   router.post(
     "/books/import/csv",
     requireAdminAuth,

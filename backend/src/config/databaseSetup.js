@@ -25,8 +25,8 @@ async function seedIfEmpty(db) {
 }
 
 async function seedAdminIfNotExists(db) {
-  const adminUsername = String(process.env.ADMIN_USERNAME || "admin");
-  const adminPassword = String(process.env.ADMIN_PASSWORD || "admin123");
+  const adminUsername = String(process.env.ADMIN_USERNAME);
+  const adminPassword = String(process.env.ADMIN_PASSWORD);
 
   const existing = await db
     .select()

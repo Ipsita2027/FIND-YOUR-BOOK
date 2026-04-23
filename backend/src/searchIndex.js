@@ -129,6 +129,22 @@ class BookSearchIndex {
     this.indexBook(book);
   }
 
+  removeBook(bookId) {
+    // Remove book from booksById map
+    this.booksById.delete(bookId);
+
+    // Remove book from books array
+    const bookIndex = this.books.findIndex((book) => book.id === bookId);
+    if (bookIndex >= 0) {
+      this.books.splice(bookIndex, 1);
+    }
+
+    // Remove book ID from all index entries
+    for (const [_term, ids] of this.index.entries()) {
+      ids.delete(bookId);
+    }
+  }
+
   search(query, category = "") {
     const queryTerms = tokenize(query);
     const categoryFilter = normalizeText(category);

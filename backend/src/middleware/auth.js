@@ -15,8 +15,8 @@ function base64UrlDecode(value) {
 }
 
 function createAdminAuth(config = {}) {
-    const secret = String(config.secret || process.env.ADMIN_TOKEN_SECRET || "find-your-book-dev-secret");
-    const tokenTtlSeconds = Number(config.tokenTtlSeconds || process.env.ADMIN_TOKEN_TTL_SECONDS || 3600);
+    const secret = String(config.secret || process.env.ADMIN_TOKEN_SECRET);
+    const tokenTtlSeconds = Number(config.tokenTtlSeconds || process.env.ADMIN_TOKEN_TTL_SECONDS);
     const adminService = config.adminService;
 
     function signPayload(encodedPayload) {
