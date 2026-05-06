@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
 import { books, admins } from "../db/schema.js";
 
 function connectDatabase() {
@@ -10,8 +10,8 @@ function connectDatabase() {
     throw new Error("DATABASE_URL is required to connect to Neon Postgres.");
   }
 
-  const client = neon(databaseUrl);
-  return drizzle(client, { schema: { books, admins } });
+  const pool= new Pool({connectionString:databaseUrl});
+  return drizzle(pool, { schema: { books, admins } });
 }
 
 export { connectDatabase };

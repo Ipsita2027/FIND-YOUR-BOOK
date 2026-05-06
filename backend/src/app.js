@@ -7,7 +7,16 @@ import { createAuthRoutes } from "./routes/authRoutes.js";
 function createApp(bookController, authController, requireAdminAuth) {
   const app = express();
 
-  app.use(cors());
+ const allowedOrigins = [
+  "http://localhost:4200",
+  process.env.FRONT_END_URL,
+];
+
+
+  app.use(cors({
+    origin:allowedOrigins,
+    credentials:true
+  }));
   app.use(express.json());
 
   app.use("/api", createHealthRoutes());

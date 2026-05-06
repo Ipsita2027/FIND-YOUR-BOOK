@@ -1,6 +1,8 @@
 import { normalizeText } from "../searchIndex.js";
 import { createBookPayloadSchema } from "../validation/bookSchemas.js";
 import { parse } from "csv-parse/sync";
+import { mapBookRow } from "../utils/bookMapper.js";
+import { books } from "../db/schema.js";
 
 const MAX_IMPORT_ROWS = 2000;
 const REQUIRED_COLUMNS = ["title", "author", "isbn", "category", "floor", "section", "shelf"];
@@ -233,14 +235,24 @@ class BookService {
     }
 
     try {
-      const inserted = await this.bookRepository.createBooksBulk(validRows);
-      for (const book of inserted) {
-        await this.index.addBook(book);
-      }
+      console.log("Trying to upload the csv")
+      // Wrap DB insert and Redis indexing in a single transaction for atomicity.
+      // If indexing fails, the DB transaction will be rolled back.
+        const inserted = await this.bookRepository.db.transaction(async (tx) => {
+        console.log("starting the transaction")
+        const rows = await tx.insert(books).values(validRows).returning();
+        console.log("inserted to db")
+        const mappedBooks = rows.map(mapBookRow);
+        console.log("mapped the db book rows")
+        // If this indexing fails, the transaction will fail and DB changes roll back.
+        await this.index.indexBooksBatch(mappedBooks);
+        console.log("trying to create the index out of the db")
+        return mappedBooks;
+      });
 
       return {
         insertedCount: inserted.length,
-        totalRows: records.length,
+        totalRows: validRows.length,
         inserted
       };
     } catch (error) {
@@ -248,7 +260,7 @@ class BookService {
         throw createHttpError(409, "CSV import failed because one or more ISBN values already exist.");
       }
 
-      throw createHttpError(500, "Failed to import books from CSV.");
+      throw createHttpError(500, "Failed to import books from CSV. Transaction rolled back.");
     }
   }
 }

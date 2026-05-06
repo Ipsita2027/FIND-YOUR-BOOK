@@ -1,4 +1,9 @@
+import { SCHEMA_FIELD_TYPE } from "redis";
+import { createRedisClient } from "./config/redis.js";
+
 const MIN_TERM_LENGTH = 2;
+const INDEX_NAME = "idx:books:v2";
+const DOC_PREFIX = "book:";
 
 function normalizeText(value) {
   return String(value || "")
@@ -20,6 +25,7 @@ function uniqueTermsFromBook(book) {
     ...tokenize(book.author),
     ...tokenize(book.isbn),
     ...tokenize(book.category),
+    ...tokenize(book.location.floor),
     ...tokenize(book.location.section),
     ...tokenize(book.location.shelf)
   ]);
@@ -27,207 +33,223 @@ function uniqueTermsFromBook(book) {
   return [...terms];
 }
 
-function levenshteinDistance(a, b) {
-  if (a === b) {
-    return 0;
-  }
-
-  if (a.length === 0) {
-    return b.length;
-  }
-
-  if (b.length === 0) {
-    return a.length;
-  }
-
-  const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
-
-  for (let i = 0; i <= a.length; i += 1) {
-    matrix[i][0] = i;
-  }
-
-  for (let j = 0; j <= b.length; j += 1) {
-    matrix[0][j] = j;
-  }
-
-  for (let i = 1; i <= a.length; i += 1) {
-    for (let j = 1; j <= b.length; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
-    }
-  }
-
-  return matrix[a.length][b.length];
+function escapeSearchTerm(term) {
+  return String(term || "").replace(/([@{}\[\]"'|()~:\-*\\])/g, "\\$1");
 }
 
-function similarityScore(a, b) {
-  if (!a || !b) {
-    return 0;
-  }
+function escapeTagValue(value) {
+  return String(value || "")
+    .replace(/([@{}\[\]|,:\\])/g, "\\$1")
+    .replace(/\s/g, "\\ ");
+}
 
-  const distance = levenshteinDistance(a, b);
-  const maxLength = Math.max(a.length, b.length);
-  return 1 - distance / maxLength;
+function toRedisBookDocument(book) {
+  const normalizedCategory = normalizeText(book.category);
+  const normalizedStatus = normalizeText(book.status);
+  const terms = uniqueTermsFromBook(book);
+
+  return {
+    id: String(book.id),
+    title: book.title,
+    author: book.author,
+    isbn: book.isbn,
+    category: normalizedCategory,
+    floor: book.location.floor,
+    section: book.location.section,
+    shelf: book.location.shelf,
+    status: normalizedStatus,
+    terms: terms.join(","),
+    searchText: normalizeText([
+      book.title,
+      book.author,
+      book.isbn,
+      normalizedCategory,
+      book.location.floor,
+      book.location.section,
+      book.location.shelf
+    ].join(" "))
+  };
+}
+
+function fromRedisBookDocument(document) {
+  const value = document.value || {};
+
+  return {
+    id: Number(value.id),
+    title: value.title,
+    author: value.author,
+    isbn: value.isbn,
+    category: value.category,
+    status: value.status,
+    location: {
+      floor: value.floor,
+      section: value.section,
+      shelf: value.shelf
+    }
+  };
 }
 
 class BookSearchIndex {
-  constructor(books = []) {
-    this.books = [];
-    this.booksById = new Map();
-    this.index = new Map();
-    this.setBooks(books);
+  constructor() {
+    this.client = createRedisClient();
+    this.indexInitialized = false;
   }
 
-  static getInstance(books = []) {
+  static getInstance() {
     if (!BookSearchIndex.instance) {
-      BookSearchIndex.instance = new BookSearchIndex(books);
-      return BookSearchIndex.instance;
-    }
-
-    if (Array.isArray(books) && books.length > 0) {
-      BookSearchIndex.instance.setBooks(books);
+      BookSearchIndex.instance = new BookSearchIndex();
     }
 
     return BookSearchIndex.instance;
   }
 
-  setBooks(books = []) {
-    this.books = [...books];
-    this.booksById.clear();
-    this.index.clear();
-
-    for (const book of this.books) {
-      this.indexBook(book);
+  async ensureConnected() {
+    if (!this.client.isOpen) {
+      await this.client.connect();
     }
   }
 
-  indexBook(book) {
-    this.booksById.set(book.id, book);
-    const terms = uniqueTermsFromBook(book);
-
-    for (const term of terms) {
-      if (!this.index.has(term)) {
-        this.index.set(term, new Set());
-      }
-      this.index.get(term).add(book.id);
-    }
-  }
-
-  addBook(book) {
-    const existingIndex = this.books.findIndex((currentBook) => currentBook.id === book.id);
-    if (existingIndex >= 0) {
-      this.books[existingIndex] = book;
-      this.setBooks(this.books);
+  async ensureIndex() {
+    if (this.indexInitialized) {
       return;
     }
 
-    this.books.push(book);
-    this.indexBook(book);
-  }
+    await this.ensureConnected();
 
-  removeBook(bookId) {
-    // Remove book from booksById map
-    this.booksById.delete(bookId);
-
-    // Remove book from books array
-    const bookIndex = this.books.findIndex((book) => book.id === bookId);
-    if (bookIndex >= 0) {
-      this.books.splice(bookIndex, 1);
+    try {
+      await this.client.ft.info(INDEX_NAME);
+      this.indexInitialized = true;
+      return;
+    } catch {
+      // Index does not exist yet, create it below.
     }
 
-    // Remove book ID from all index entries
-    for (const [_term, ids] of this.index.entries()) {
-      ids.delete(bookId);
+    await this.client.ft.create(
+      INDEX_NAME,
+      {
+        id: { type: SCHEMA_FIELD_TYPE.NUMERIC, SORTABLE: true },
+        title: { type: SCHEMA_FIELD_TYPE.TEXT, WEIGHT: 5, SORTABLE: true },
+        author: { type: SCHEMA_FIELD_TYPE.TEXT, WEIGHT: 3 },
+        isbn: { type: SCHEMA_FIELD_TYPE.TEXT, WEIGHT: 4 },
+        category: { type: SCHEMA_FIELD_TYPE.TAG, SORTABLE: true },
+        floor: { type: SCHEMA_FIELD_TYPE.TEXT },
+        section: { type: SCHEMA_FIELD_TYPE.TEXT },
+        shelf: { type: SCHEMA_FIELD_TYPE.TEXT },
+        status: { type: SCHEMA_FIELD_TYPE.TAG },
+        terms: { type: SCHEMA_FIELD_TYPE.TAG },
+        searchText: { type: SCHEMA_FIELD_TYPE.TEXT, WEIGHT: 2 }
+      },
+      {
+        ON: "HASH",
+        PREFIX: DOC_PREFIX
+      }
+    );
+
+    this.indexInitialized = true;
+  }
+
+  async clearIndexedBooks() {
+    const keys = await this.client.keys(`${DOC_PREFIX}*`);
+    if (keys.length > 0) {
+      await this.client.del(...keys);
     }
   }
 
-  search(query, category = "") {
-    const queryTerms = tokenize(query);
-    const categoryFilter = normalizeText(category);
+  async setBooks(books = []) {
+    await this.ensureIndex();
+    await this.clearIndexedBooks();
+
+    if (!Array.isArray(books) || books.length === 0) {
+      return;
+    }
+
+    const transaction = this.client.multi();
+    for (const book of books) {
+      const key = `${DOC_PREFIX}${book.id}`;
+      transaction.hSet(key, toRedisBookDocument(book));
+    }
+
+    await transaction.exec();
+  }
+
+  async indexBook(book) {
+    await this.ensureIndex();
+    const key = `${DOC_PREFIX}${book.id}`;
+    await this.client.hSet(key, toRedisBookDocument(book));
+  }
+
+  async addBook(book) {
+    await this.indexBook(book);
+  }
+
+  async indexBooksBatch(books) {
+    await this.ensureIndex();
+
+    if (!Array.isArray(books) || books.length === 0) {
+      return;
+    }
+
+    const transaction = this.client.multi();
+    for (const book of books) {
+      const key = `${DOC_PREFIX}${book.id}`;
+      transaction.hSet(key, toRedisBookDocument(book));
+    }
+
+    await transaction.exec();
+  }
+
+  async removeBook(bookId) {
+    await this.ensureIndex();
+    await this.client.del(`${DOC_PREFIX}${bookId}`);
+  }
+
+  buildQuery(rawQuery, rawCategory = "") {
+    const queryTerms = tokenize(rawQuery);
+    const category = normalizeText(rawCategory);
+    const categoryClause = category ? `@category:{${escapeTagValue(category)}}` : "";
 
     if (queryTerms.length === 0) {
-      return this.books
-        .filter((book) => (categoryFilter ? normalizeText(book.category) === categoryFilter : true))
-        .sort((a, b) => a.title.localeCompare(b.title));
+      return categoryClause || "*";
     }
 
-    const scores = new Map();
+    const termClauses = queryTerms.map((term) => {
+      const escapedTermTag = escapeTagValue(term);
+      const escapedTermText = escapeSearchTerm(term);
 
-    for (const queryTerm of queryTerms) {
-      const exactMatches = this.index.get(queryTerm) || new Set();
+      const exact = `@terms:{${escapedTermTag}}`;
+      const prefix = `@terms:{${escapedTermTag}*}`;
+      const fuzzy = `@searchText:%${escapedTermText}%`;
 
-      for (const id of exactMatches) {
-        scores.set(id, (scores.get(id) || 0) + 5);
-      }
+      return `(${exact}|${prefix}|${fuzzy})`;
+    });
 
-      for (const [term, ids] of this.index.entries()) {
-        if (term === queryTerm) {
-          continue;
-        }
+    return [termClauses.join(" "), categoryClause].filter(Boolean).join(" ");
+  }
 
-        if (term.startsWith(queryTerm) || queryTerm.startsWith(term)) {
-          for (const id of ids) {
-            scores.set(id, (scores.get(id) || 0) + 2);
-          }
-        }
-      }
+  async search(query, category = "") {
+    await this.ensureIndex();
+
+    const hasSearchText = tokenize(query).length > 0;
+    const searchQuery = this.buildQuery(query, category);
+
+    const result = await this.client.ft.search(INDEX_NAME, searchQuery, {
+      LIMIT: { from: 0, size: 50 },
+      ...(hasSearchText ? {} : { SORTBY: "title" }),
+      DIALECT: 2
+    });
+
+    const books = result.documents.map(fromRedisBookDocument);
+
+    if (hasSearchText) {
+      return books;
     }
 
-    for (const [id, book] of this.booksById.entries()) {
-      const bookTerms = uniqueTermsFromBook(book);
-      let fuzzyAggregate = 0;
-
-      for (const queryTerm of queryTerms) {
-        let bestTermSimilarity = 0;
-
-        for (const term of bookTerms) {
-          const score = similarityScore(queryTerm, term);
-          if (score > bestTermSimilarity) {
-            bestTermSimilarity = score;
-          }
-        }
-
-        if (bestTermSimilarity >= 0.72) {
-          fuzzyAggregate += bestTermSimilarity * 3;
-        }
-      }
-
-      const fullText = normalizeText([
-        book.title,
-        book.author,
-        book.isbn,
-        book.category,
-        book.location.section
-      ].join(" "));
-
-      if (normalizeText(query) && fullText.includes(normalizeText(query))) {
-        fuzzyAggregate += 3;
-      }
-
-      if (fuzzyAggregate > 0) {
-        scores.set(id, (scores.get(id) || 0) + fuzzyAggregate);
-      }
-    }
-
-    return [...scores.entries()]
-      .map(([id, score]) => ({ book: this.booksById.get(id), score }))
-      .filter(({ book }) => (categoryFilter ? normalizeText(book.category) === categoryFilter : true))
-      .sort((a, b) => {
-        if (b.score !== a.score) {
-          return b.score - a.score;
-        }
-        return a.book.title.localeCompare(b.book.title);
-      })
-      .map(({ book }) => book);
+    return books.sort((a, b) => a.title.localeCompare(b.title));
   }
 }
 
-function createBookSearchIndex(books) {
-  return BookSearchIndex.getInstance(books);
+function createBookSearchIndex() {
+  return BookSearchIndex.getInstance();
 }
 
 export { BookSearchIndex, createBookSearchIndex, normalizeText };
